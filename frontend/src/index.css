@@ -1,0 +1,68 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-slate-950 text-slate-100 font-sans antialiased;
+  }
+}
+
+/* Custom thin dark scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  @apply bg-slate-950;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-slate-700 rounded-full;
+}
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-slate-600;
+}
+
+/* Markdown styling */
+.markdown-body {
+  @apply text-sm leading-relaxed;
+}
+.markdown-body p {
+  @apply mb-4;
+}
+.markdown-body p:last-child {
+  @apply mb-0;
+}
+.markdown-body pre {
+  @apply bg-slate-900 p-3 rounded-lg overflow-x-auto mb-4;
+}
+.markdown-body code {
+  @apply bg-slate-900 text-blue-300 px-1 py-0.5 rounded text-xs font-mono;
+}
+.markdown-body pre code {
+  @apply bg-transparent p-0 text-slate-200 text-sm;
+}
+.markdown-body ul {
+  @apply list-disc list-inside mb-4;
+}
+.markdown-body ol {
+  @apply list-decimal list-inside mb-4;
+}
+.markdown-body strong {
+  @apply font-semibold text-white;
+}
+
+/* Typing animation */
+@keyframes typing {
+  0%, 100% { opacity: 0.2; }
+  20% { opacity: 1; }
+}
+.typing-dot {
+  animation: typing 1.4s infinite both;
+}
+.typing-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.typing-dot:nth-child(3) {
+  animation-delay: 0.4s;
+}

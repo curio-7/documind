@@ -1,0 +1,154 @@
+# ==============================================================================
+# DocuMind - Multi-Container Docker Compose Orchestration
+# ==============================================================================
+# Services:
+#   1. postgres    - PostgreSQL 17 with pgvector extension for vector storage
+#   2. ollama      - Local LLM & embedding inference engine
+#   3. ollama-pull - One-shot init container to pull llama3.2 & nomic-embed-text
+#   4. backend     - Spring Boot 3 + LangChain4j REST & RAG Service
+#   5. frontend    - React + Vite + Tailwind CSS UI served via Nginx
+# ==============================================================================
+
+services:
+  # ----------------------------------------------------------------------------
+  # PostgreSQL with pgvector extension
+  # Stores relational document metadata and LangChain4j vector embeddings
+  # ----------------------------------------------------------------------------
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: documind-postgres
+    restart: unless-stopped
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-documind}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-documind_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-documind}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./init-db:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: [ "CMD", "ollama", "list" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - documind-network
+
+  # ----------------------------------------------------------------------------
+  # Ollama - Local AI inference engine
+  # Runs chat completion (llama3.2) and embedding (nomic-embed-text) models
+  # ----------------------------------------------------------------------------
+  ollama:
+    image: ollama/ollama:latest
+    container_name: documind-ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:11434/api/tags || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - documind-network
+
+  # ----------------------------------------------------------------------------
+  # Ollama Model Puller - One-shot initialization service
+  # Downloads the required chat and embedding models into Ollama volume
+  # ----------------------------------------------------------------------------
+  ollama-pull:
+    image: ollama/ollama:latest
+    container_name: documind-ollama-pull
+    restart: "no"
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "Pulling Chat Model: llama3.2..."
+        ollama pull llama3.2
+        echo "Pulling Embedding Model: nomic-embed-text..."
+        ollama pull nomic-embed-text
+        echo "Model initialization complete."
+    networks:
+      - documind-network
+
+  # ----------------------------------------------------------------------------
+  # Spring Boot Backend Application
+  # Document processing, LangChain4j RAG pipeline, and REST API
+  # ----------------------------------------------------------------------------
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: documind-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+      ollama-pull:
+        condition: service_completed_successfully
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    environment:
+      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL:-jdbc:postgresql://postgres:5432/documind}
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-documind}
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-documind_secret}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    networks:
+      - documind-network
+
+  # ----------------------------------------------------------------------------
+  # React + Vite Frontend Application
+  # Single Page Application served with Nginx reverse proxy
+  # ----------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: documind-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "5173:80"
+    networks:
+      - documind-network
+
+# ------------------------------------------------------------------------------
+# Persistent Storage Volumes
+# ------------------------------------------------------------------------------
+volumes:
+  pgdata:
+    driver: local
+    name: documind_pgdata
+  ollama_data:
+    driver: local
+    name: documind_ollama_data
+
+# ------------------------------------------------------------------------------
+# Bridge Network for Service Intercommunication
+# ------------------------------------------------------------------------------
+networks:
+  documind-network:
+    driver: bridge
+    name: documind-network

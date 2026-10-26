@@ -1,0 +1,45 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: documind
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/documind}
+    username: ${SPRING_DATASOURCE_USERNAME:documind}
+    password: ${SPRING_DATASOURCE_PASSWORD:documind_secret}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  servlet:
+    multipart:
+      max-file-size: ${SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE:50MB}
+      max-request-size: ${SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE:50MB}
+
+# Ollama Configuration
+ollama:
+  base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
+  chat-model: ${OLLAMA_CHAT_MODEL:llama3.2}
+  embedding-model: ${OLLAMA_EMBEDDING_MODEL:nomic-embed-text}
+  timeout: 120
+
+# Vector Store Configuration  
+vector-store:
+  table-name: document_embeddings
+  dimension: ${EMBEDDING_DIMENSION:768}
+
+# Document Processing
+document:
+  chunk-size: 512
+  chunk-overlap: 50
+  max-results: 5
+
+logging:
+  level:
+    com.documind: DEBUG
+    dev.langchain4j: DEBUG
